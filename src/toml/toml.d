@@ -50,8 +50,7 @@ enum TOML_TYPE : byte {
 	LOCAL_TIME,         /// ditto
 	ARRAY,              /// ditto
 	TABLE,              /// ditto
-	TRUE,				/// ditto
-	FALSE				/// ditto
+	BOOL,               /// ditto
 
 }
 
@@ -95,6 +94,7 @@ struct TOMLValue {
 		string str;
 		long integer;
 		double floating;
+		bool boolean;
 		SysTime offsetDatetime;
 		DateTime localDatetime;
 		Date localDate;
@@ -142,14 +142,11 @@ struct TOMLValue {
 	}
 	
 	/**
-	 * Throws: TOMLException if type is not TOML_TYPE.TRUE or TOML_TYPE.FALSE
+	 * Throws: TOMLException if type is not TOML_TYPE.BOOL
 	 */
 	public @property @trusted bool boolean() const {
-		switch (this._type) {
-			case TOML_TYPE.TRUE: return true;
-			case TOML_TYPE.FALSE: return false;
-			default: throw new TOMLException("TOMLValue is not a boolean");
-		}
+		enforce!TOMLException(this._type == TOML_TYPE.BOOL, "TOMLValue is not a float");
+		return this.store.boolean;
 	}
 	
 	/**
@@ -287,7 +284,8 @@ struct TOMLValue {
 			this.store.table = data;
 			this._type = TOML_TYPE.TABLE;
 		} else static if(is(T == bool)) {
-			_type = value ? TOML_TYPE.TRUE : TOML_TYPE.FALSE;
+			this.store.boolean = value;
+			this._type = TOML_TYPE.BOOL;
 		} else {
 			static assert(0);
 		}
@@ -300,6 +298,7 @@ struct TOMLValue {
 				case STRING: return this.store.str == value.store.str;
 				case INTEGER: return this.store.integer == value.store.integer;
 				case FLOAT: return this.store.floating == value.store.floating;
+				case BOOL: return this.store.boolean == value.store.boolean;
 				case OFFSET_DATETIME: return this.store.offsetDatetime == value.store.offsetDatetime;
 				case LOCAL_DATETIME: return this.store.localDatetime == value.store.localDatetime;
 				case LOCAL_DATE: return this.store.localDate == value.store.localDate;
@@ -307,7 +306,6 @@ struct TOMLValue {
 				case ARRAY: return this.store.array == value.store.array;
 				//case TABLE: return this.store.table == value.store.table; // causes errors
 				case TABLE: return this.opEquals(value.store.table);
-				case TRUE: case FALSE: return true;
 			}
 		} else static if(is(T : string)) {
 			return this._type == TOML_TYPE.STRING && this.store.str == value;
@@ -341,7 +339,8 @@ struct TOMLValue {
 			}
 			return true;
 		} else static if(is(T == bool)) {
-			return value ? _type == TOML_TYPE.TRUE : _type == TOML_TYPE.FALSE;
+			if(this._type != TOML_TYPE.BOOL) return false;
+			return this.store.boolean == value;
 		} else {
 			return false;
 		}
@@ -369,10 +368,8 @@ struct TOMLValue {
 				return hashOf(store.array);
 			case TABLE:
 				return hashOf(store.table);
-			case TRUE:
-				return hashOf(true);
-			case FALSE:
-				return hashOf(false);
+			case BOOL:
+				return hashOf(store.boolean);
 		}
 	}
 
@@ -421,11 +418,8 @@ struct TOMLValue {
 				}
 				appender.put(" }");
 				break;
-			case TRUE:
-				appender.put("true");
-				break;
-			case FALSE:
-				appender.put("false");
+			case BOOL:
+				appender.put(this.store.boolean ? "true" : "false");
 				break;
 		}
 	}
@@ -1225,8 +1219,8 @@ trimmed in raw strings.
 		bool1 = true
 		bool2 = false
 	`);
-	assert(doc["bool1"].type == TOML_TYPE.TRUE);
-	assert(doc["bool2"].type == TOML_TYPE.FALSE);
+	assert(doc["bool1"].type == TOML_TYPE.BOOL);
+	assert(doc["bool2"].type == TOML_TYPE.BOOL);
 	assert(doc["bool1"] == true);
 	assert(doc["bool2"] == false);
 
